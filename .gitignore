@@ -4,5 +4,5 @@
 tmp/
 
 data
-.env
+*.env
 baremetal
