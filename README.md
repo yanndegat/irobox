@@ -35,6 +35,7 @@ Run Ironic
 git clone https://github.com/yanndegat/irobox
 cd irobox
 make up
+...
 ./baremetal driver list
 ```
 
@@ -62,8 +63,7 @@ Leverage `oslo.config` configuragion by environment variables.
 
 Edit `vars/` env files and customize conf:
 
-``` sh
-cat > ironic-conf.env <<
+``` ironic.env
 OS_DEFAULT__AUTH_STRATEGY=noauth
 OS_DEFAULT__DEBUG=True
 OS_DEFAULT__DEFAULT_BOOT_INTERFACE=ipxe
@@ -72,9 +72,8 @@ OS_DEFAULT__DEFAULT_INSPECT_INTERFACE=inspector
 OS_DEFAULT__DEFAULT_NETWORK_INTERFACE=noop
 OS_DEFAULT__ENABLED_BOOT_INTERFACES=ipxe
 OS_DEFAULT__ENABLED_DEPLOY_INTERFACES=direct,fake
-OS_DEFAULT__ENABLED_HARDWARE_TYPES=ovhapi
+OS_DEFAULT__ENABLED_HARDWARE_TYPES=ipmi
 OS_DEFAULT__ENABLED_INSPECT_INTERFACES=inspector
-EOF
 ```
 
 You can of course edit components conf files directly (e.g.: `./neutron/etc/plugins/ml2/ml2_conf.ini`)
