@@ -1,0 +1,159 @@
+services:
+  pause:
+    image: "${PAUSE_IMAGE}"
+    ports:
+      - 6180:6180
+      - 6385:6385
+      - 5050:5050
+
+  db-ironic:
+    image: "${MARIADB_IMAGE}"
+    env_file:
+      - .env
+    environment:
+      MYSQL_USER: ironic
+      MYSQL_DATABASE: ironic
+    volumes:
+      - db-ironic:/var/lib/mysql
+
+  db-ironic-inspector:
+    image: "${MARIADB_IMAGE}"
+    env_file:
+      - .env
+    environment:
+      MYSQL_USER: ironic
+      MYSQL_DATABASE: ironic-inspector
+    volumes:
+      - db-ironic-inspector:/var/lib/mysql
+
+  cache:
+    image: "${MEMCACHED_IMAGE}"
+    env_file:
+      - .env
+
+  dnsmasq:
+    image: "${IRONIC_IMAGE}"
+    command : /bin/rundnsmasq
+    network_mode: host
+    env_file:
+      - .env
+    volumes:
+      - data:/shared
+
+  api:
+    build:
+      dockerfile: Dockerfile
+      context: .
+      args:
+        BASE: ${IRONIC_IMAGE}
+        IRONIC_DEV_MODE: ${IRONIC_DEV_MODE}
+        IRONIC_LIB_REPO: ${IRONIC_LIB_REPO}
+        IRONIC_REPO: ${IRONIC_REPO}
+        IRONIC_INSPECTOR_REPO: ${IRONIC_INSPECTOR_REPO}
+
+    network_mode: service:pause
+    command : /bin/runironic-api
+    depends_on:
+      db-ironic:
+        condition: service_started
+      cache:
+        condition: service_started
+      conductor:
+        condition: service_started
+      inspector:
+        condition: service_started
+    env_file:
+      - .env
+    volumes:
+      - data:/shared
+      - ./bin/ironic-common.sh:/bin/ironic-common.sh
+
+  conductor:
+    build:
+      dockerfile: Dockerfile
+      context: .
+      args:
+        BASE: ${IRONIC_IMAGE}
+        IRONIC_DEV_MODE: ${IRONIC_DEV_MODE}
+        IRONIC_LIB_REPO: ${IRONIC_LIB_REPO}
+        IRONIC_REPO: ${IRONIC_REPO}
+        IRONIC_INSPECTOR_REPO: ${IRONIC_INSPECTOR_REPO}
+
+    network_mode: service:pause
+    command : /bin/runironic-conductor
+    env_file:
+      - .env
+    depends_on:
+      db-ironic:
+        condition: service_started
+      cache:
+        condition: service_started
+    volumes:
+      - data:/shared
+      - ./bin/ironic-common.sh:/bin/ironic-common.sh
+
+  inspector:
+    build:
+      dockerfile: Dockerfile
+      context: .
+      args:
+        BASE: ${IRONIC_IMAGE}
+        IRONIC_DEV_MODE: ${IRONIC_DEV_MODE}
+        IRONIC_LIB_REPO: ${IRONIC_LIB_REPO}
+        IRONIC_REPO: ${IRONIC_REPO}
+        IRONIC_INSPECTOR_REPO: ${IRONIC_INSPECTOR_REPO}
+    network_mode: service:pause
+    command : /bin/runironic-inspector
+    depends_on:
+      db-ironic-inspector:
+        condition: service_started
+      cache:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      OS_DATABASE__CONNECTION: mysql+pymysql://ironic:${MYSQL_PASSWORD}@db-ironic-inspector/ironic-inspector
+    volumes:
+      - data:/shared
+      - ./bin/ironic-common.sh:/bin/ironic-common.sh
+
+  log-watch:
+    build:
+      dockerfile: Dockerfile
+      context: .
+      args:
+        BASE: ${IRONIC_IMAGE}
+        IRONIC_DEV_MODE: ${IRONIC_DEV_MODE}
+        IRONIC_LIB_REPO: ${IRONIC_LIB_REPO}
+        IRONIC_REPO: ${IRONIC_REPO}
+        IRONIC_INSPECTOR_REPO: ${IRONIC_INSPECTOR_REPO}
+
+    network_mode: service:pause
+    command : /bin/runlogwatch.sh
+    depends_on:
+      conductor:
+        condition: service_started
+      api:
+        condition: service_started
+    volumes:
+      - data:/shared
+      - ./bin/ironic-common.sh:/bin/ironic-common.sh
+
+
+  keystone-setup:
+    image: "${KEYSTONE_IMAGE}"
+    entrypoint : /keystone-post-setup.sh
+    command: start
+    depends_on:
+      api:
+        condition: service_started
+    env_file:
+      - .env
+    volumes:
+      - ./bin/keystone-post-setup.sh:/keystone-post-setup.sh:ro
+      - ../keystone/bin/admin-openrc.sh:/admin-openrc.sh:ro
+
+volumes:
+  data:
+  db-ironic:
+  db-ironic-inspector:

@@ -1,0 +1,99 @@
+services:
+  db:
+    image: "${MARIADB_IMAGE}"
+    env_file:
+      - .env
+    environment:
+      MYSQL_USER: keystone
+      MYSQL_DATABASE: keystone
+    volumes:
+      - db:/var/lib/mysql
+
+  cache:
+    image: "${MEMCACHED_IMAGE}"
+    env_file:
+      - .env
+
+  setup:
+    image: "${KEYSTONE_IMAGE}"
+    command : /setup.sh
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    depends_on:
+      db:
+        condition: service_started
+      cache:
+        condition: service_started
+    env_file:
+      - .env
+    volumes:
+      - fernetkeys:/etc/keystone/fernet-keys
+      - credentialkeys:/etc/keystone/credential-keys
+      - ./etc/logging.conf:/etc/keystone/logging.conf:ro
+      - ./bin/setup.sh:/setup.sh:ro
+      - ./etc/keystone.conf:/etc/keystone/keystone.conf:ro
+
+  api:
+    image: "${KEYSTONE_IMAGE}"
+    entrypoint : /run.sh
+    command: start
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    depends_on:
+      db:
+        condition: service_started
+      cache:
+        condition: service_started
+      setup:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    ports:
+      - 5000:5000
+    volumes:
+      - fernetkeys:/etc/keystone/fernet-keys
+      - credentialkeys:/etc/keystone/credential-keys
+      - ./etc/logging.conf:/etc/keystone/logging.conf:ro
+      - ./bin/run.sh:/run.sh:ro
+      - ./etc/keystone.conf:/etc/keystone/keystone.conf:ro
+      - ./etc/apache-site.conf:/etc/apache2/conf-enabled/keystone.conf:ro
+      - ./bin/admin-openrc.sh:/admin-openrc.sh:ro
+
+
+  setup-admin-endpoints:
+    image: "${MARIADB_IMAGE}"
+    command: /setup-admin-endpoints.sh
+    depends_on:
+      db:
+        condition: service_started
+      setup:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    volumes:
+      - ./bin/setup-admin-endpoints.sh:/setup-admin-endpoints.sh:ro
+
+  post-setup:
+    image: "${KEYSTONE_IMAGE}"
+    entrypoint : /post-setup.sh
+    command: start
+    depends_on:
+      api:
+        condition: service_started
+      setup-admin-endpoints:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+
+    volumes:
+      - ./bin/post-setup.sh:/post-setup.sh:ro
+      - ./bin/admin-openrc.sh:/admin-openrc.sh:ro
+
+volumes:
+  db:
+  fernetkeys:
+  credentialkeys:

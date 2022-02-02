@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -eEuo pipefail
+
+SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+IRONIC_CLIENT_IMAGE=${IRONIC_CLIENT_IMAGE:-"quay.io/metal3-io/ironic-client"}
+
+if [[ ! -f "${SCRIPTDIR}/clouds.yaml" ]]; then
+    echo "clouds.yaml is missing" >&2
+    exit 1
+fi
+
+docker run --net=host --rm -it \
+  -v "${SCRIPTDIR}/clouds.yaml:/etc/openstack/clouds.yaml" \
+  -e OS_CLOUD="${OS_CLOUD:-ironic}" \
+  "${IRONIC_CLIENT_IMAGE}" "$@"

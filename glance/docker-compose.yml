@@ -1,0 +1,102 @@
+services:
+  db:
+    image: "${MARIADB_IMAGE}"
+    env_file:
+      - .env
+    environment:
+      MYSQL_USER: glance
+      MYSQL_DATABASE: glance
+    volumes:
+      - db:/var/lib/mysql
+
+  cache:
+    image: "${MEMCACHED_IMAGE}"
+    env_file:
+      - .env
+
+  setup:
+    image: "${GLANCE_IMAGE}"
+    command : [ "glance-manage", "db_sync", "glance" ]
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    depends_on:
+      db:
+        condition: service_started
+      cache:
+        condition: service_started
+    env_file:
+      - .env
+    volumes:
+      - ./etc/logging.conf:/etc/glance/logging.conf:ro
+      - ./etc/glance.conf:/etc/glance/glance.conf:ro
+      - data:/var/lib/glance/images
+
+  api:
+    build:
+      dockerfile: Dockerfile
+      context: .
+      args:
+        BASE: ${GLANCE_IMAGE}
+    command:  ["glance-api", "--config-file", "/etc/glance/glance.conf"]
+    depends_on:
+      cache:
+        condition: service_started
+      setup:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    ports:
+      - 9292:9292
+    volumes:
+      - ./etc/logging.conf:/etc/glance/logging.conf:ro
+      - ./etc/glance.conf:/etc/glance/glance.conf:ro
+      - ./etc/api-paste.ini:/etc/glance/api-paste.ini:ro
+      - data:/var/lib/glance/images
+
+
+  ipa-downloader:
+    image: "${IPA_DOWNLOADER_IMAGE}"
+    command: "/usr/local/bin/get-resource.sh"
+    env_file:
+      - .env
+    volumes:
+      - setup-images:/shared/html/images
+
+  post-setup:
+    image: "${KEYSTONE_IMAGE}"
+    entrypoint : /post-setup.sh
+    depends_on:
+      api:
+        condition: service_started
+      ipa-downloader:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      OS_USERNAME: admin
+      OS_PASSWORD: "${KEYSTONE_ADMIN_PASSWORD}"
+      OS_PROJECT_NAME: admin
+    volumes:
+      - ./bin/post-setup.sh:/post-setup.sh:ro
+      - setup-images:/images
+
+
+  keystone-setup:
+    image: "${KEYSTONE_IMAGE}"
+    entrypoint : /keystone-post-setup.sh
+    command: start
+    depends_on:
+      api:
+        condition: service_started
+    env_file:
+      - .env
+    volumes:
+      - ./bin/keystone-post-setup.sh:/keystone-post-setup.sh:ro
+      - ../keystone/bin/admin-openrc.sh:/admin-openrc.sh:ro
+
+volumes:
+  db:
+  data:
+  setup-images:

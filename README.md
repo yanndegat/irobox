@@ -3,59 +3,64 @@ Irobox
 
 This repo contains the files needed to run a standalone Ironic service easily.
 
+
 Description
 -----------
 
-This repo is 100% based on the work done by the [metal3.io](https://github.com/metal3-io/ "metal3.io")_ project.
+WIP!
 
-This is a simpe wrap up in a docker-compose.yml file.
+This repo is based on the work done by the [metal3.io](https://github.com/metal3-io/ "metal3.io")_ project.
+
+This is a wrap up of docker-compose.yml files to setup all useful openstack services in order to get a friendly ironic environment.
+
+This includes:
+
+- keystone for user management
+- glance for image management
+- horizon for UI
+- neutron for networking management 
+- dicious: golang example project to collect ironic notifications
 
 _DISCLAIMER_: This is *NOT FOR PRODUCTION* :)
 
 Pre-requisites
 --------------
 
-You need a installation of docker + docker-compose.
+You need a installation of docker + docker-compose, and an ssh pub key.
 
 Run Ironic 
 ----------
 
 ``` sh
-cd $HOME
-mkdir -p src
-cd src
 git clone https://github.com/yanndegat/irobox
 cd irobox
-make .env up
+make up
 ./baremetal driver list
 ```
 
 Run Ironic from source
 ----------------------
 
-You can easily run this ironic service from ironic source.
+You can easily run this ironic service from ironic source by editing the `vars/ironic.env` file:
 
 
-``` sh
-cd $HOME
-mkdir -p src
-cd src
-git clone https://opendev.org/openstack/ironic
-git clone https://github.com/yanndegat/irobox
-cd irobox
-export IRONIC_DEV_MODE=true
-make .env up
+``` ironic.env
+...
+
+IRONIC_DEV_MODE=true
+IRONIC_VERSION=stable/xena
+IRONIC_LIB_REPO="https://opendev.org/openstack/ironic-lib.git"
+IRONIC_REPO="https://opendev.org/openstack/ironic.git"
+IRONIC_INSPECTOR_REPO="https://opendev.org/openstack/ironic-inspector.git"
 ```
 
-_Note_: you can change ironic source dir by changing the env var `IRONIC_SRC_DIR` accordingly. 
 
-
-Hack Ironic configuragion
+Hack openstack configuragion
 -------------------------
 
 Leverage `oslo.config` configuragion by environment variables.
 
-Create an env file and customize ironic conf:
+Edit `vars/` env files and customize conf:
 
 ``` sh
 cat > ironic-conf.env <<
@@ -72,13 +77,14 @@ OS_DEFAULT__ENABLED_INSPECT_INTERFACES=inspector
 EOF
 ```
 
-Then export the following variable and make up again.
+You can of course edit components conf files directly (e.g.: `./neutron/etc/plugins/ml2/ml2_conf.ini`)
 
-``` sh
-export IRONIC_EXTRA_VARS=./ironic-conf.env
-make .env up
-```
+Non Goals
+----------
 
+- HA deployment
+- Production hardening
+- kubernetes
 
 Motivation
 ----------

@@ -1,0 +1,225 @@
+services:
+  db:
+    image: "${MARIADB_IMAGE}"
+    env_file:
+      - .env
+    environment:
+      MYSQL_USER: neutron
+      MYSQL_DATABASE: neutron
+    volumes:
+      - db:/var/lib/mysql
+
+  mq:
+    image: "${RABBITMQ_IMAGE}"
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_DEFAULT_VHOST: neutron
+      RABBITMQ_DEFAULT_USER: neutron
+    volumes:
+      - mq:/var/lib/rabbitmq
+
+  cache:
+    image: "${MEMCACHED_IMAGE}"
+    env_file:
+      - .env
+
+  setup:
+    image: "${NEUTRON_IMAGE}"
+    command : [ "neutron-db-manage", "upgrade", "head" ]
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    depends_on:
+      db:
+        condition: service_started
+      cache:
+        condition: service_started
+    env_file:
+      - .env
+    volumes:
+      - ./etc/logging.conf:/etc/neutron/logging.conf:ro
+      - ./etc/neutron.conf:/etc/neutron/neutron.conf:ro
+      - data:/var/lib/neutron/images
+
+  api:
+    build:
+      dockerfile: Dockerfile
+      context: .
+      args:
+        BASE: ${NEUTRON_IMAGE}
+    command:
+    - "neutron-server"
+    - "--config-file=/etc/neutron/api-paste.ini"
+    - "--config-file=/etc/neutron/logging.conf"
+    - "--config-file=/etc/neutron/neutron-api.conf"
+    - "--config-file=/etc/neutron/neutron.conf"
+    - "--config-file=/etc/neutron/plugins/ml2/ml2_conf.ini"
+    - "--config-file=/etc/neutron/plugins/ml2/ironic_neutron_agent.ini"
+    - "--config-file=/etc/neutron/plugins/ml2/genericswitch_agent.ini"
+    - "--config-file=/etc/neutron/plugins/ml2/openvswitch_agent.ini"
+    depends_on:
+      cache:
+        condition: service_started
+      setup:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    ports:
+      - 9696:9696
+    volumes:
+      - ./etc/api-paste.ini:/etc/neutron/api-paste.ini:ro
+      - ./etc/logging.conf:/etc/neutron/logging.conf:ro
+      - ./etc/neutron-api.conf:/etc/neutron/neutron-api.conf:ro
+      - ./etc/neutron.conf:/etc/neutron/neutron.conf:ro
+      - ./etc/plugins/ml2/ml2_conf.ini:/etc/neutron/plugins/ml2/ml2_conf.ini:ro
+      - ./etc/plugins/ml2/openvswitch_agent.ini:/etc/neutron/plugins/ml2/openvswitch_agent.ini:ro
+      - ./etc/plugins/ml2/genericswitch_agent.ini:/etc/neutron/plugins/ml2/genericswitch_agent.ini:ro
+      - ./etc/plugins/ml2/ironic_neutron_agent.ini:/etc/neutron/plugins/ml2/ironic_neutron_agent.ini:ro
+
+
+  ovs-setup:
+    image: "${NEUTRON_IMAGE}"
+    command : [ "/setup.sh" ]
+    network_mode: host
+    privileged: true
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    env_file:
+      - .env
+    volumes:
+      - ovs-lib:/var/lib/openvswitch
+      - ovs-run:/var/run/openvswitch
+      - /lib/modules:/lib/modules
+      - ./bin/ovs-setup.sh:/setup.sh
+
+  # ovs:
+  #   image: "${NEUTRON_IMAGE}"
+  #   command : [ "/run.sh" ]
+  #   network_mode: host
+  #   privileged: true
+  #   depends_on:
+  #     ovs-setup:
+  #       condition: service_completed_successfully
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - ovs-lib:/var/lib/openvswitch
+  #     - ovs-run:/var/run/openvswitch
+  #     - /lib/modules:/lib/modules
+  #     - ./bin/ovs-run.sh:/run.sh
+
+  # ovs-agent:
+  #   build:
+  #     dockerfile: Dockerfile
+  #     context: .
+  #     args:
+  #       BASE: ${NEUTRON_IMAGE}
+  #   network_mode: host
+  #   privileged: true
+  #   command:
+  #   - "neutron-openvswitch-agent"
+  #   - "--config-file=/etc/neutron/logging.conf"
+  #   - "--config-file=/etc/neutron/neutron.conf"
+  #   - "--config-file=/etc/neutron/rootwrap.conf"
+  #   - "--config-file=/etc/neutron/plugins/ml2/ml2_conf.ini"
+  #   - "--config-file=/etc/neutron/plugins/ml2/openvswitch_agent.ini"
+  #   depends_on:
+  #     ovs:
+  #       condition: service_started
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - ./etc/logging.conf:/etc/neutron/logging.conf:ro
+  #     - ./etc/neutron.conf:/etc/neutron/neutron.conf:ro
+  #     - ./etc/plugins/ml2/ml2_conf.ini:/etc/neutron/plugins/ml2/ml2_conf.ini:ro
+  #     - ./etc/plugins/ml2/openvswitch_agent.ini:/etc/neutron/plugins/ml2/openvswitch_agent.ini:ro
+  #     - ./etc/rootwrap.conf:/etc/neutron/rootwrap.conf:ro
+  #     - ovs-run:/var/run/openvswitch
+
+  ironic-agent:
+    build:
+      dockerfile: Dockerfile
+      context: .
+      args:
+        BASE: ${NEUTRON_IMAGE}
+    command:
+    - "ironic-neutron-agent"
+    - "--config-file=/etc/neutron/logging.conf"
+    - "--config-file=/etc/neutron/neutron.conf"
+    - "--config-file=/etc/neutron/rootwrap.conf"
+    - "--config-file=/etc/neutron/plugins/ml2/ml2_conf.ini"
+    - "--config-file=/etc/neutron/plugins/ml2/ironic_neutron_agent.ini"
+    env_file:
+      - .env
+    volumes:
+      - ./etc/logging.conf:/etc/neutron/logging.conf:ro
+      - ./etc/neutron.conf:/etc/neutron/neutron.conf:ro
+      - ./etc/plugins/ml2/ml2_conf.ini:/etc/neutron/plugins/ml2/ml2_conf.ini:ro
+      - ./etc/plugins/ml2/ironic_neutron_agent.ini:/etc/neutron/plugins/ml2/ironic_neutron_agent.ini:ro
+      - ./etc/rootwrap.conf:/etc/neutron/rootwrap.conf:ro
+
+  metadata-agent:
+    build:
+      dockerfile: Dockerfile
+      context: .
+      args:
+        BASE: ${NEUTRON_IMAGE}
+    command:
+    - "neutron-metadata-agent"
+    - "--config-file=/etc/neutron/logging.conf"
+    - "--config-file=/etc/neutron/neutron.conf"
+    - "--config-file=/etc/neutron/rootwrap.conf"
+    env_file:
+      - .env
+    volumes:
+      - ./etc/logging.conf:/etc/neutron/logging.conf:ro
+      - ./etc/neutron.conf:/etc/neutron/neutron.conf:ro
+      - ./etc/rootwrap.conf:/etc/neutron/rootwrap.conf:ro
+      - metadata-proxy:/run/neutron-metadata-agent
+
+  dhcp-agent:
+    build:
+      dockerfile: Dockerfile
+      context: .
+      args:
+        BASE: ${NEUTRON_IMAGE}
+    command:
+    - "neutron-dhcp-agent"
+    - "--config-file=/etc/neutron/logging.conf"
+    - "--config-file=/etc/neutron/neutron.conf"
+    - "--config-file=/etc/neutron/rootwrap.conf"
+    env_file:
+      - .env
+    volumes:
+      - ./etc/logging.conf:/etc/neutron/logging.conf:ro
+      - ./etc/neutron.conf:/etc/neutron/neutron.conf:ro
+      - ./etc/rootwrap.conf:/etc/neutron/rootwrap.conf:ro
+      - metadata-proxy:/run/neutron-metadata-agent
+
+
+  keystone-setup:
+    image: "${KEYSTONE_IMAGE}"
+    entrypoint : /keystone-post-setup.sh
+    command: start
+    depends_on:
+      api:
+        condition: service_started
+    env_file:
+      - .env
+    volumes:
+      - ./bin/keystone-post-setup.sh:/keystone-post-setup.sh:ro
+      - ../keystone/bin/admin-openrc.sh:/admin-openrc.sh:ro
+
+
+volumes:
+  mq:
+  db:
+  data:
+  ovs-lib:
+  ovs-run:
+  metadata-proxy:
+  setup-images:

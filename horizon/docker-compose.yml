@@ -1,0 +1,21 @@
+services:
+  cache:
+    image: "${MEMCACHED_IMAGE}"
+    env_file:
+      - .env
+
+  ui:
+    build: .
+    entrypoint : /run.sh
+    command: start
+    depends_on:
+      cache:
+        condition: service_started
+    env_file:
+      - .env
+    ports:
+      - 8080:80
+    volumes:
+      - ./etc/local_settings.py:/etc/openstack-dashboard/local_settings.py:ro
+      - ./etc/apache-site.conf:/etc/apache2/conf-enabled/openstack-dashboard.conf:ro
+      - ./bin/run.sh:/run.sh:ro
