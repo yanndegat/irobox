@@ -7,6 +7,7 @@ set -eEuox pipefail
 PROJECT_DOMAIN_ID=$(openstack domain create --or-show --enable -f value -c id \
                               --description="Domain for ${OS_REGION_NAME}/${OS_PROJECT_DOMAIN_NAME}" \
                               "${OS_PROJECT_DOMAIN_NAME}")
+SVC_PROJECT_ID=$(openstack project show -f value -c id --domain="${PROJECT_DOMAIN_ID}" "admin");
 
 USER_DOMAIN_ID=$(openstack domain create --or-show --enable -f value -c id \
     --description="Domain for ${OS_REGION_NAME}/${OS_USER_DOMAIN_NAME}" \
@@ -41,5 +42,6 @@ assign_endpoint identity public "${USER_PROJECT_ID}"
 assign_endpoint identity admin "${USER_PROJECT_ID}"
 assign_endpoint identity internal "${USER_PROJECT_ID}"
 
+assign_user_role "${USER_ID}" "${SVC_PROJECT_ID}" admin
 assign_user_role "${USER_ID}" "${USER_PROJECT_ID}" admin
 assign_user_role "${USER_ID}" "${USER_PROJECT_ID}" member
