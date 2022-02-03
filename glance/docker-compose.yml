@@ -64,25 +64,6 @@ services:
     volumes:
       - setup-images:/shared/html/images
 
-  post-setup:
-    image: "${KEYSTONE_IMAGE}"
-    entrypoint : /post-setup.sh
-    depends_on:
-      api:
-        condition: service_started
-      ipa-downloader:
-        condition: service_completed_successfully
-    env_file:
-      - .env
-    environment:
-      OS_USERNAME: admin
-      OS_PASSWORD: "${KEYSTONE_ADMIN_PASSWORD}"
-      OS_PROJECT_NAME: admin
-    volumes:
-      - ./bin/post-setup.sh:/post-setup.sh:ro
-      - setup-images:/images
-
-
   keystone-setup:
     image: "${KEYSTONE_IMAGE}"
     entrypoint : /keystone-post-setup.sh
@@ -95,6 +76,26 @@ services:
     volumes:
       - ./bin/keystone-post-setup.sh:/keystone-post-setup.sh:ro
       - ../keystone/bin/admin-openrc.sh:/admin-openrc.sh:ro
+
+  post-setup:
+    image: "${KEYSTONE_IMAGE}"
+    entrypoint : /post-setup.sh
+    depends_on:
+      api:
+        condition: service_started
+      ipa-downloader:
+        condition: service_completed_successfully
+      keystone-setup:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      OS_USERNAME: admin
+      OS_PASSWORD: "${KEYSTONE_ADMIN_PASSWORD}"
+      OS_PROJECT_NAME: admin
+    volumes:
+      - ./bin/post-setup.sh:/post-setup.sh:ro
+      - setup-images:/images
 
 volumes:
   db:
