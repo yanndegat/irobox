@@ -89,4 +89,4 @@ Motivation
 ----------
 
 - have an easy setup for ironic dev.
-- maybe at some point, use a small ironic pilot my nucs at home.
+- maybe at some point, use a small ironic to pilot my NUCs & Pis at home.
