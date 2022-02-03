@@ -39,6 +39,16 @@ make up
 ./baremetal driver list
 ```
 
+Access the horizon interface `http://YOURIP|localhost:8080/horizon/admin` 
+
+logins are either `admin` or `superuser` (cf: `./docker-compose.env.sh`).
+password is the same for all users:
+
+```sh
+awk -F= '/KEYSTONE_ADMIN_PASSWORD/ {print $2}' ironic/.env
+```
+
+
 Run Ironic from source
 ----------------------
 
