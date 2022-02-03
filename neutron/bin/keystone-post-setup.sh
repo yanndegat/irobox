@@ -16,9 +16,9 @@ create_endpoint "${NEUTRON_SVC_ID}" admin "http://${NEUTRON_NODE}:9696"
 create_endpoint "${NEUTRON_SVC_ID}" public "http://${NEUTRON_NODE}:9696"
 create_endpoint "${NEUTRON_SVC_ID}" internal "http://${NEUTRON_NODE}:9696"
 
-assign_endpoint image public "${SVC_PROJECT_ID}"
-assign_endpoint image internal "${SVC_PROJECT_ID}"
-assign_endpoint image admin "${SVC_PROJECT_ID}"
+assign_endpoint network public "${SVC_PROJECT_ID}"
+assign_endpoint network internal "${SVC_PROJECT_ID}"
+assign_endpoint network admin "${SVC_PROJECT_ID}"
 
 # setup neutron svc users
 NEUTRON_USER_DESC="NEUTRON Service User for ${OS_REGION_NAME}/${OS_USER_DOMAIN_NAME}"
@@ -39,3 +39,4 @@ assign_user_role "${NEUTRON_USER_ID}" "${SVC_PROJECT_ID}" admin
 USER_PROJECT_ID=$(openstack project show -f value -c id "${USER_OS_PROJECT_NAME}")
 
 assign_endpoint network public "${USER_PROJECT_ID}"
+assign_endpoint network admin "${USER_PROJECT_ID}"
