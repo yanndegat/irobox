@@ -5,7 +5,7 @@ set -eEuo pipefail
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # shellcheck source=.env
-source "${SCRIPTDIR}/.env"
+source "${SCRIPTDIR}/ironic/.env"
 
 cat > clouds.yaml <<EOF
 clouds:

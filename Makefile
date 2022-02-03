@@ -12,7 +12,7 @@ down: keystone-down glance-down horizon-down ironic-down neutron-down  dicious-d
 .PHONY: clean
 clean: keystone-clean glance-clean horizon-clean ironic-clean neutron-clean dicious-clean ## clean ironic & deps
 
-./clouds.yaml: .env
+./clouds.yaml: ironic-env
 	@./clouds.yaml.sh
 
 .PHONY: %-env
