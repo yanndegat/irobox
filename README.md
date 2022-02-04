@@ -94,9 +94,26 @@ Non Goals
 - HA deployment
 - Production hardening
 - kubernetes
+- become an official openstack project
 
 Motivation
 ----------
 
-- have an easy setup for ironic dev.
+- have an easy setup for ironic dev/POCs.
+- POC ironic+neutron to pilot baremetal hosts & TOR switches.
 - maybe at some point, use a small ironic to pilot my NUCs & Pis at home.
+
+Other (non)similar projects
+---------------------------
+
+There are many other similar projects which you could use to have an ironic environment, such as:
+
+- [bifrost](https://opendev.org/openstack/bifrost) 
+- [kayobe](https://opendev.org/openstack/kayobe)
+- or even [devstack](https://opendev.org/openstack/devstack)
+
+This project typically differs from these in:
+
+- it's very opinionated, there's no feature that you can easily enable/disable without having to hack the code/conf.
+- it's more like a quick way to boot ironic+neutron and hack it for POC environments.
+- it's (at least in my opinion) much simpler to use than devstack for this single purpose.
