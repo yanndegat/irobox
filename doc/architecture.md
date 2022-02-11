@@ -128,11 +128,11 @@ The setup comes with a small helper script to have access to the baremetal API:
 
 But there are plenty other CLIs you could use and for which there's no helper script (yet).
 
-one typical hack i use is:
+one typical hack is to use the keystone api container as an admin node:
 
 ```sh
 docker exec -it keystone_api_1 bash
-source admin_openrc.sh
+source /admin_openrc.sh
 openstack catalog list
 ...
 pip3 install python-ironicclient metalsmith
@@ -142,6 +142,22 @@ openstack baremetal node list
 metalsmith deploy --help
 ```
 
+
+Interactions with the introspection api:
+
+```sh
+docker exec -it keystone_api_1 bash
+apt install jq
+pip3 install  python-ironicclient python-ironic-inspector-client
+...
+# unset OS_* env vars
+eval "$(env | awk -F= '/^OS_/ { print "unset " $1 ";" }')"
+baremetal node list
+baremetal introspection interface list --os-endpoint http://${SERVICE_IP}:5050 --os-auth-type none NODE_NAME
+baremetal introspection rule list --os-endpoint http://${SERVICE_IP}:5050 --os-auth-type none 
+baremetal introspection data save --os-endpoint http://${SERVICE_IP}:5050 --os-auth-type none NODE_NAME | jq 
+
+```
 
 Makefiles & docker-compose & hacks
 --------------------------
