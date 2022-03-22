@@ -9,7 +9,6 @@ if [[ ! -d "${SUBSYSTEM}" ]]; then
   exit 1
 fi
 
-
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ENVFILE="${SUBSYSTEM}/.env"
 
@@ -44,6 +43,24 @@ export SERVICE_INTERFACE="${SERVICE_INTERFACE:=$(ip route get 1.2.3.4 | awk '/sr
 export SERVICE_IP="${SERVICE_IP:=$(ip -brief addr show dev "${SERVICE_INTERFACE}" | awk '{print $3}' | cut -d / -f1)}"
 export SSH_KEY_FILE="${SSH_KEY_FILE:="$HOME/.ssh/id_rsa.pub"}"
 export SSH_PUB_KEY="$(cat ${SSH_KEY_FILE})"
+export BR_PRIV=br-priv
+export BR_PRIV_NETIF=ens224
+
+export BM_NET_NAME=physnet1
+
+export ADMIN_NET_NAME=adminnet
+export ADMIN_NET_GW_IP=10.100.14.254
+export ADMIN_NET_CIDR=10.100.14.0/24
+export ADMIN_NET_START_IP=10.100.14.10
+export ADMIN_NET_END_IP=10.100.14.100
+
+export USER_NET_NAME=usernet
+export USER_NET_CIDR=10.0.0.0/24
+export USER_NET_START_IP=10.0.0.1
+export USER_NET_END_IP=10.0.0.254
+
+# hack to escape envsubst unwanted substitution
+export default_processing_hooks='$default_processing_hooks'
 
 MARIADB_PASSWORD=${MARIADB_PASSWORD:-""}
 

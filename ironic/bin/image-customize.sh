@@ -32,9 +32,8 @@ gpgkey=https://packages.confluent.io/clients/rpm/archive.key
 enabled=1
 EOF
 
-dnf install -y gcc
-dnf install -y python3-devel
-dnf install -y librdkafka-devel
+dnf groupinstall -y "development tools"
+dnf install -y openssl-devel pam-devel zlib-devel python3-devel librdkafka-devel iputils mtr socat vim
 pip3 install "oslo.messaging[kafka]"
 
 if [ "${IRONIC_DEV_MODE}" == "true" ]; then
@@ -43,4 +42,9 @@ if [ "${IRONIC_DEV_MODE}" == "true" ]; then
     install_pkg ironic-inspector "${IRONIC_INSPECTOR_REPO}"
 fi
 
-exec "$@"
+## shell in a box install
+(cd /tmp;
+ git clone https://github.com/shellinabox/shellinabox.git && cd shellinabox;
+ autoreconf -i; ./configure LIBS="-lssl -lcrypto" && make && make install;
+ cp etc-pam.d-shellinabox-example /etc/pam.d/shellinabox;
+ cd /tmp; rm -Rf shellinabox )

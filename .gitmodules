@@ -1,0 +1,3 @@
+[submodule "netbox/netbox"]
+	path = netbox/netbox
+	url = https://github.com/netbox-community/netbox-docker

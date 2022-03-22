@@ -18,6 +18,11 @@ services:
       RABBITMQ_DEFAULT_USER: neutron
     volumes:
       - mq:/var/lib/rabbitmq
+    # sadly, ovs neutron agent has to run in network_mode:host
+    # so it need an access port to neutron rpc message bus
+    ports:
+      - 9672:5672
+
 
   cache:
     image: "${MEMCACHED_IMAGE}"
@@ -62,6 +67,10 @@ services:
     depends_on:
       cache:
         condition: service_started
+      db:
+        condition: service_started
+      mq:
+        condition: service_started
       setup:
         condition: service_completed_successfully
     env_file:
@@ -96,49 +105,54 @@ services:
       - /lib/modules:/lib/modules
       - ./bin/ovs-setup.sh:/setup.sh
 
-  # ovs:
-  #   image: "${NEUTRON_IMAGE}"
-  #   command : [ "/run.sh" ]
-  #   network_mode: host
-  #   privileged: true
-  #   depends_on:
-  #     ovs-setup:
-  #       condition: service_completed_successfully
-  #   env_file:
-  #     - .env
-  #   volumes:
-  #     - ovs-lib:/var/lib/openvswitch
-  #     - ovs-run:/var/run/openvswitch
-  #     - /lib/modules:/lib/modules
-  #     - ./bin/ovs-run.sh:/run.sh
+  ovs:
+    image: "${NEUTRON_IMAGE}"
+    command : [ "/run.sh" ]
+    network_mode: host
+    privileged: true
+    depends_on:
+      ovs-setup:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    volumes:
+      - ovs-lib:/var/lib/openvswitch
+      - ovs-run:/var/run/openvswitch
+      - /lib/modules:/lib/modules
+      - ./bin/ovs-run.sh:/run.sh
 
-  # ovs-agent:
-  #   build:
-  #     dockerfile: Dockerfile
-  #     context: .
-  #     args:
-  #       BASE: ${NEUTRON_IMAGE}
-  #   network_mode: host
-  #   privileged: true
-  #   command:
-  #   - "neutron-openvswitch-agent"
-  #   - "--config-file=/etc/neutron/logging.conf"
-  #   - "--config-file=/etc/neutron/neutron.conf"
-  #   - "--config-file=/etc/neutron/rootwrap.conf"
-  #   - "--config-file=/etc/neutron/plugins/ml2/ml2_conf.ini"
-  #   - "--config-file=/etc/neutron/plugins/ml2/openvswitch_agent.ini"
-  #   depends_on:
-  #     ovs:
-  #       condition: service_started
-  #   env_file:
-  #     - .env
-  #   volumes:
-  #     - ./etc/logging.conf:/etc/neutron/logging.conf:ro
-  #     - ./etc/neutron.conf:/etc/neutron/neutron.conf:ro
-  #     - ./etc/plugins/ml2/ml2_conf.ini:/etc/neutron/plugins/ml2/ml2_conf.ini:ro
-  #     - ./etc/plugins/ml2/openvswitch_agent.ini:/etc/neutron/plugins/ml2/openvswitch_agent.ini:ro
-  #     - ./etc/rootwrap.conf:/etc/neutron/rootwrap.conf:ro
-  #     - ovs-run:/var/run/openvswitch
+  ovs-agent:
+    build:
+      dockerfile: Dockerfile
+      context: .
+      args:
+        BASE: ${NEUTRON_IMAGE}
+    network_mode: host
+    privileged: true
+    command:
+    - "neutron-openvswitch-agent"
+    - "--config-file=/etc/neutron/logging.conf"
+    - "--config-file=/etc/neutron/neutron.conf"
+    - "--config-file=/etc/neutron/rootwrap.conf"
+    - "--config-file=/etc/neutron/plugins/ml2/ml2_conf.ini"
+    - "--config-file=/etc/neutron/plugins/ml2/openvswitch_agent.ini"
+    depends_on:
+      ovs:
+        condition: service_started
+      mq:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      OS_DEFAULT__TRANSPORT_URL: rabbit://neutron:${RABBITMQ_DEFAULT_PASS}@${SERVICE_IP}:9672/neutron
+    volumes:
+      - ./etc/logging.conf:/etc/neutron/logging.conf:ro
+      - ./etc/neutron.conf:/etc/neutron/neutron.conf:ro
+      - ./etc/plugins/ml2/ml2_conf.ini:/etc/neutron/plugins/ml2/ml2_conf.ini:ro
+      - ./etc/plugins/ml2/openvswitch_agent.ini:/etc/neutron/plugins/ml2/openvswitch_agent.ini:ro
+      - ./etc/rootwrap.conf:/etc/neutron/rootwrap.conf:ro
+      - ovs-run:/var/run/openvswitch
+      - /lib/modules:/lib/modules
 
   ironic-agent:
     build:
@@ -168,6 +182,11 @@ services:
       context: .
       args:
         BASE: ${NEUTRON_IMAGE}
+    depends_on:
+      ovs-agent:
+        condition: service_started
+      mq:
+        condition: service_started
     command:
     - "neutron-metadata-agent"
     - "--config-file=/etc/neutron/logging.conf"
@@ -187,18 +206,30 @@ services:
       context: .
       args:
         BASE: ${NEUTRON_IMAGE}
+    network_mode: host
+    privileged: true
+    depends_on:
+      ovs-agent:
+        condition: service_started
+      mq:
+        condition: service_started
     command:
-    - "neutron-dhcp-agent"
-    - "--config-file=/etc/neutron/logging.conf"
-    - "--config-file=/etc/neutron/neutron.conf"
-    - "--config-file=/etc/neutron/rootwrap.conf"
+      - "neutron-dhcp-agent"
+      - "--config-file=/etc/neutron/logging.conf"
+      - "--config-file=/etc/neutron/neutron.conf"
+      - "--config-file=/etc/neutron/rootwrap.conf"
+      - "--config-file=/etc/neutron/plugins/ml2/openvswitch_agent.ini"
     env_file:
       - .env
+    environment:
+      OS_DEFAULT__TRANSPORT_URL: rabbit://neutron:${RABBITMQ_DEFAULT_PASS}@${SERVICE_IP}:9672/neutron
     volumes:
       - ./etc/logging.conf:/etc/neutron/logging.conf:ro
       - ./etc/neutron.conf:/etc/neutron/neutron.conf:ro
       - ./etc/rootwrap.conf:/etc/neutron/rootwrap.conf:ro
+      - ./etc/plugins/ml2/openvswitch_agent.ini:/etc/neutron/plugins/ml2/openvswitch_agent.ini:ro
       - metadata-proxy:/run/neutron-metadata-agent
+      - ovs-run:/var/run/openvswitch
 
 
   keystone-setup:
@@ -212,6 +243,24 @@ services:
       - .env
     volumes:
       - ./bin/keystone-post-setup.sh:/keystone-post-setup.sh:ro
+      - ../keystone/bin/admin-openrc.sh:/admin-openrc.sh:ro
+
+  post-setup:
+    image: "${KEYSTONE_IMAGE}"
+    entrypoint : /post-setup.sh
+    command: start
+    network_mode: host # important so that hostname resolves to the proper dhcp agent name
+    depends_on:
+      api:
+        condition: service_started
+      dhcp-agent:
+        condition: service_started
+      ovs-agent:
+        condition: service_started
+    env_file:
+      - .env
+    volumes:
+      - ./bin/post-setup.sh:/post-setup.sh:ro
       - ../keystone/bin/admin-openrc.sh:/admin-openrc.sh:ro
 
 

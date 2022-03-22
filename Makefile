@@ -27,3 +27,4 @@ clean: keystone-clean glance-clean horizon-clean ironic-clean neutron-clean dici
 
 %-clean: ## clean subsystem
 	$(MAKE) -C $* clean
+

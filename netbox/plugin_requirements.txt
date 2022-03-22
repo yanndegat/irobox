@@ -1,0 +1,2 @@
+# ntc-netbox-plugin-onboarding is not supported by netbox >= 3.0
+# ntc-netbox-plugin-onboarding

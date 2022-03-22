@@ -5,6 +5,7 @@ services:
       - 6180:6180
       - 6385:6385
       - 5050:5050
+      - 20000-20100:20000-20100
 
   db-ironic:
     image: "${MARIADB_IMAGE}"
@@ -35,6 +36,7 @@ services:
     image: "${IRONIC_IMAGE}"
     command : /bin/rundnsmasq
     network_mode: host
+    privileged: true
     env_file:
       - .env
     volumes:
@@ -152,6 +154,26 @@ services:
     volumes:
       - ./bin/keystone-post-setup.sh:/keystone-post-setup.sh:ro
       - ../keystone/bin/admin-openrc.sh:/admin-openrc.sh:ro
+
+
+  post-setup:
+    image: "${KEYSTONE_IMAGE}"
+    entrypoint : /post-setup.sh
+    depends_on:
+      inspector:
+        condition: service_started
+      keystone-setup:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      OS_USERNAME: admin
+      OS_PASSWORD: "${KEYSTONE_ADMIN_PASSWORD}"
+      OS_PROJECT_NAME: admin
+    volumes:
+      - ./bin/post-setup.sh:/post-setup.sh:ro
+      - ../keystone/bin/admin-openrc.sh:/admin-openrc.sh:ro
+      - data:/shared
 
 volumes:
   data:
